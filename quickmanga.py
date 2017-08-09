@@ -1,0 +1,162 @@
+#!/usr/bin/env python
+import requests
+from lxml import html
+import os
+from tqdm import tqdm
+import pydoc
+import string
+from urllib.request import urlretrieve
+
+url_mangalist = 'http://www.mangapanda.com/alphabetical'
+url_root = 'http://www.mangapanda.com'
+base_dir = os.path.abspath(__file__)
+
+
+def read_mana_name():
+    return input('Enter Manga Name: ')
+
+
+def search_manga(manga_name):
+    print('Searching %s . ' % (manga_name))
+    page = requests.get(url_mangalist)
+    # print(page)
+    tree = html.fromstring(page.content)
+    manga_list = tree.xpath(
+        '//div[@class="series_alpha" and ./h2/a/text()="%c"]/ul/li/a/text()'
+        % (manga_name[0].upper()))
+    result = []
+    if len(manga_list) == 0:
+        print("No result found !")
+        return None
+    manga_urls = tree.xpath(
+        '//div[@class="series_alpha" and ./h2/a/text()="%c"]/ul/li/a/@href'
+        % (manga_name[0].upper()))
+    # print(manga_urls)
+    mangas = dict(zip(manga_list, manga_urls))
+    for manga in mangas:
+        if manga_name.lower() in manga.lower():
+            result.append((manga, mangas[manga]))
+    print("Results:")
+    # print(result)
+    for i, r in enumerate(result):
+        print("#%i\t%s" % (i, r[0]))
+    manga_result = None
+    while True:
+        index = int(input('Select One :'))
+        if index >= 0 and index < len(result):
+            manga_result = (result[index])
+            break
+        else:
+            print("Invalid Selection")
+            continue
+    return manga_result
+
+
+def get_episode_count(manga_url):
+    url = url_root + manga_url
+    page = requests.get(url)
+    tree = html.fromstring(page.content)
+    latest_episode = tree.xpath('//div[@id="latestchapters"]/ul/li[1]/a/@href')
+    # print(latest_episode)
+    return latest_episode[0].split('/')[-1]
+
+
+def get_episodes_list(manga):
+    url_tmp = url_root+manga[1]
+    page = requests.get(url_tmp)
+    tree = html.fromstring(page.content)
+    episodes_n = tree.xpath(
+        '//div[@id="chapterlist"]/table[@id="listing"]/tr/td[a]/text()'
+    )
+    episodes_c = tree.xpath(
+        '//div[@id="chapterlist"]/table[@id="listing"]/tr/td/a/text()'
+    )
+    episodes_name = [e.split(':')[-1].strip() for e in episodes_n if ':' in e]
+    episodes_count = [ec.split()[-1].strip() for ec in episodes_c]
+    episodes_all = dict(zip(episodes_count, episodes_name))
+    return episodes_all
+
+
+def download_episode(manga, episodes):
+    try:
+        os.mkdir(manga[0])
+    except:
+        pass
+    os.chdir(manga[0])
+    print("Downloading in dir ./%s" % (manga[0]))
+    episodes_count = get_episode_count(manga[1])
+    episodes_all = get_episodes_list(manga)
+    if '*' in episodes:
+        episodes = [str(x) for x in range(1, int(episodes_count)+1)]
+    for episode in episodes:
+        if str(episode) not in episodes_all:
+            print('Episode %i not available!' % (int(episode)))
+            continue
+        episode_url = url_root+manga[1]+'/'+str(episode)
+        try:
+            os.mkdir('Chapter ' + episode + ' ' + episodes_all[episode])
+        except:
+            pass
+        os.chdir('Chapter ' + episode + ' ' + episodes_all[episode])
+        page = requests.get(episode_url)
+        tree = html.fromstring(page.content)
+        page_count = len(tree.xpath('//select[@id="pageMenu"]/option/text()'))
+        for p in range(1, page_count):
+            episode_page_url = episode_url + '/' + str(p)
+            # print('Episode %i : %s' % (p, episode_page_url))
+            page = requests.get(episode_page_url)
+            tree = html.fromstring(page.content)
+            image_url = tree.xpath('//img[@name="img"]/@src')[0]
+            filename = str(p) + '.' + image_url.split('.')[-1]
+            print('Downloading Episode #%s %s (%i/%i) ...\r' % (episode, episodes_all[episode], p, page_count), end='')
+            response = requests.get(image_url, stream=True)
+            with open(filename, "wb") as handle:
+                for data in response.iter_content():
+                    handle.write(data)
+        print('Downloaded  Episode #%s %s (%i/%i) ...\r' % (episode, episodes_all[episode], page_count, page_count))
+        os.chdir('..')
+
+
+def get_user_action():
+    while True:
+        manga_name = read_mana_name()
+        manga_result = search_manga(manga_name)
+
+        while True:
+            print(
+                "Actions:\n1. Download\n2. List Episode\n0. Back\n"
+            )
+            i = input('> ')
+            if i == '1':
+                print("\nEnter comma seperated episode number like 1,2,3,60 \nEnter * to download all episodes like *")
+                episodes = input('> ')
+                episodes = episodes.split(',')
+                if '*' in episodes:
+                    download_episode(manga_result, ['*'])
+                else:
+                    download_episode(manga_result, episodes)
+            elif i == '2':
+                episode_list = get_episodes_list(manga_result)
+                sorted_list = sorted(
+                    episode_list,
+                    key=lambda x: int(x.lower().rstrip(
+                        string.ascii_lowercase)))
+                text = '{:25s} {:25s}\n'.format('Episode #', 'Episode Name')
+                for i in sorted_list:
+                    text += '{:25s} {:25s}\n'.format(str(i), episode_list[i])
+                pydoc.pager(text)
+            elif i == '0':
+                break
+            else:
+                continue
+
+
+if __name__ == '__main__':
+    # name = read_mana_name()  
+    # manga_result = search_manga(name)
+    # episode_count = get_episode_count(manga_result[1])
+    # manga = ('One Piece', '/one-piece')
+    # episodes = ['10', '12']
+    # download_episode(manga, episodes)
+    # action = get_u
+    get_user_action()

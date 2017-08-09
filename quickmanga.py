@@ -6,6 +6,7 @@ from tqdm import tqdm
 import pydoc
 import string
 from urllib.request import urlretrieve
+import sys, getopt
 
 url_mangalist = 'http://www.mangapanda.com/alphabetical'
 url_root = 'http://www.mangapanda.com'
@@ -16,8 +17,8 @@ def read_mana_name():
     return input('Enter Manga Name: ')
 
 
-def search_manga(manga_name):
-    print('Searching %s . ' % (manga_name))
+def search_manga(manga_name, show_selection=True):
+    print('Searching %s . \r' % (manga_name), end='')
     page = requests.get(url_mangalist)
     # print(page)
     tree = html.fromstring(page.content)
@@ -36,6 +37,8 @@ def search_manga(manga_name):
     for manga in mangas:
         if manga_name.lower() in manga.lower():
             result.append((manga, mangas[manga]))
+    if not show_selection:
+        return result
     print("Results:")
     # print(result)
     for i, r in enumerate(result):
@@ -151,6 +154,47 @@ def get_user_action():
                 continue
 
 
+def print_usage():
+    print("Usage: ./quickmanga.py -S <> -D <> -R <> -L <>")
+
+
+def print_help():
+    print_usage()
+    print('''
+    Options
+    -------------
+    -h      --help          print this help message
+    -S      --search        search Manga
+    -D      --download      Download Manga, provide url
+    -R      --read          Read Manga, provide url
+    -L     --latest         Read Latest Manga, provide url
+    ''')
+
+
+def main(argv):
+    try:
+        opts, args = getopt.getopt(argv, "hS:D:L:", ["help", "search=", "download=", "read="])
+    except getopt.GetoptError:
+        print_usage()
+        sys.exit(2)
+    for opt, arg in opts:
+        if opt == '-h':
+            print_help()
+            sys.exit()
+        elif opt in ("-S", "--search"):
+            manga_name = arg
+            result = search_manga(manga_name, show_selection=False)
+            print('{:10s} {:25s} {:25s} '.format('#', 'Manga Name', 'Manga URL'))
+            for i, r in enumerate(result, 1):
+                print('{:10s} {:25s} {:25s}'.format(str(i), r[0], r[1]))
+        elif opt in ("-D", "--download"):
+            manga_url = arg
+            print('To Download %s' % (manga_url))
+        elif opt in ("-R", "--read"):
+            manga_url = arg
+            print('To Read %s' % (manga_url))
+
+
 if __name__ == '__main__':
     # name = read_mana_name()  
     # manga_result = search_manga(name)
@@ -159,4 +203,5 @@ if __name__ == '__main__':
     # episodes = ['10', '12']
     # download_episode(manga, episodes)
     # action = get_u
-    get_user_action()
+    main(sys.argv[1:])
+    # get_user_action()

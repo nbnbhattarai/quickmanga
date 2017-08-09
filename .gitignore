@@ -5,3 +5,5 @@
 
 # html
 *.html
+
+__pycache__/

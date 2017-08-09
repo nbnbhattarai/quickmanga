@@ -6,7 +6,8 @@ from tqdm import tqdm
 import pydoc
 import string
 from urllib.request import urlretrieve
-import sys, getopt
+import sys
+import getopt
 
 url_mangalist = 'http://www.mangapanda.com/alphabetical'
 url_root = 'http://www.mangapanda.com'
@@ -15,6 +16,14 @@ base_dir = os.path.abspath(__file__)
 
 def read_mana_name():
     return input('Enter Manga Name: ')
+
+
+def get_manga_by_url(manga_url):
+    tmp_url = url_root+manga_url
+    page = requests.get(tmp_url)
+    tree = html.fromstring(page.content)
+    manga_name = tree.xpath('//div[@id="mangaproperties"]/table/tr/td/h2[@class="aname"]/text()')
+    return (manga_name[0], manga_url)
 
 
 def search_manga(manga_name, show_selection=True):
@@ -167,16 +176,22 @@ def print_help():
     -S      --search        search Manga
     -D      --download      Download Manga, provide url
     -R      --read          Read Manga, provide url
-    -L     --latest         Read Latest Manga, provide url
+    -L      --latest        Read Latest Manga, provide url
+    -E      --episode       Specify Episode
     ''')
 
 
 def main(argv):
     try:
-        opts, args = getopt.getopt(argv, "hS:D:L:", ["help", "search=", "download=", "read="])
+        opts, args = getopt.getopt(argv, "hS:D:L:E:", ["help", "search=", "download=", "read=", "episode="])
     except getopt.GetoptError:
         print_usage()
         sys.exit(2)
+    episodes_t = []
+    for opt, arg in opts:
+        if opt in ('-E', '--episode'):
+            episodes_t = arg.split(',')
+
     for opt, arg in opts:
         if opt == '-h':
             print_help()
@@ -187,11 +202,20 @@ def main(argv):
             print('{:10s} {:25s} {:25s} '.format('#', 'Manga Name', 'Manga URL'))
             for i, r in enumerate(result, 1):
                 print('{:10s} {:25s} {:25s}'.format(str(i), r[0], r[1]))
+
+        # Download this manga
         elif opt in ("-D", "--download"):
             manga_url = arg
-            print('To Download %s' % (manga_url))
+            if manga_url[0] != '/':
+                manga_url = '/'+manga_url
+            manga = get_manga_by_url(manga_url)
+            download_episode(manga, episodes_t)
+
+        # Read This manga
         elif opt in ("-R", "--read"):
             manga_url = arg
+            if manga_url[0] != '/':
+                manga_url = '/'+manga_url
             print('To Read %s' % (manga_url))
 
 

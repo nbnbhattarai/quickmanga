@@ -193,7 +193,7 @@ def print_help():
 
 def main(argv):
     try:
-        opts, args = getopt.getopt(argv, "hS:D:L:E:R:", ["help", "search=", "download=", "read=", "episode="])
+        opts, args = getopt.getopt(argv, "hS:D:L:E:R:", ["help", "search=", "download=", "read=", "episode=", "list="])
     except getopt.GetoptError:
         print_usage()
         sys.exit(2)
@@ -233,6 +233,23 @@ def main(argv):
                 path = '"' +  manga[0] + '/Chapter ' + str(e_count) + ' ' + str(e_name) + '"'
                 os.system('feh '+path)
             print('Read Complete...')
+
+        # List All Episodes
+        elif opt in ("-L", "--list"):
+            manga_url = arg
+            if manga_url[0] != '/':
+                manga_url = '/'+manga_url
+            manga = get_manga_by_url(manga_url)
+            episode_list = get_episodes_list(manga)
+            sorted_list = sorted(
+                episode_list,
+                key=lambda x: int(x.lower().rstrip(
+                    string.ascii_lowercase)))
+            text = '{:15s} {:25s}\n'.format('#', 'Episode Name')
+            for i in sorted_list:
+                text += '{:15s} {:25s}\n'.format(str(i), episode_list[i])
+            print(text)
+
 
 if __name__ == '__main__':
     # name = read_mana_name()  

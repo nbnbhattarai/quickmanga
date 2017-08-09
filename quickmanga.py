@@ -27,7 +27,7 @@ def get_manga_by_url(manga_url):
 
 
 def search_manga(manga_name, show_selection=True):
-    print('Searching %s . \r' % (manga_name), end='')
+    print('Searching %s\r' % (manga_name), end='')
     page = requests.get(url_mangalist)
     # print(page)
     tree = html.fromstring(page.content)
@@ -89,13 +89,15 @@ def get_episodes_list(manga):
     return episodes_all
 
 
-def download_episode(manga, episodes):
+def download_episode(manga, episodes, silent=False):
     try:
         os.mkdir(manga[0])
     except:
         pass
     os.chdir(manga[0])
-    print("Downloading in dir ./%s" % (manga[0]))
+    if not silent:
+        print("Downloading in dir ./%s" % (manga[0]))
+    episode_pages = []
     episodes_count = get_episode_count(manga[1])
     episodes_all = get_episodes_list(manga)
     if '*' in episodes:
@@ -113,21 +115,29 @@ def download_episode(manga, episodes):
         page = requests.get(episode_url)
         tree = html.fromstring(page.content)
         page_count = len(tree.xpath('//select[@id="pageMenu"]/option/text()'))
-        for p in range(1, page_count):
+        episode_pages.append((episodes_all[episode], episode, page_count))
+        for p in range(1, page_count+1):
             episode_page_url = episode_url + '/' + str(p)
             # print('Episode %i : %s' % (p, episode_page_url))
             page = requests.get(episode_page_url)
             tree = html.fromstring(page.content)
             image_url = tree.xpath('//img[@name="img"]/@src')[0]
             filename = str(p) + '.' + image_url.split('.')[-1]
-            print('Downloading Episode #%s %s (%i/%i) ...\r' % (episode, episodes_all[episode], p, page_count), end='')
+            if silent:
+                print('Downloading [%s](%i/%i) ...\r' % (episodes_all[episode], p, page_count), end='')
+            else:
+                print('Downloading Episode #%s %s (%i/%i) ...\r' % (episode, episodes_all[episode], p, page_count), end='')
             response = requests.get(image_url, stream=True)
             with open(filename, "wb") as handle:
                 for data in response.iter_content():
                     handle.write(data)
-        print('Downloaded  Episode #%s %s (%i/%i) ...\r' % (episode, episodes_all[episode], page_count, page_count))
+        if silent:
+            print('Downloaded  [%s](%i/%i) ...\r' % (episodes_all[episode], page_count, page_count))
+        else:
+            print('Downloaded  Episode #%s %s (%i/%i) ...\r' % (episode, episodes_all[episode], page_count, page_count))
         os.chdir('..')
-
+    os.chdir('..')
+    return episode_pages
 
 def get_user_action():
     while True:
@@ -183,7 +193,7 @@ def print_help():
 
 def main(argv):
     try:
-        opts, args = getopt.getopt(argv, "hS:D:L:E:", ["help", "search=", "download=", "read=", "episode="])
+        opts, args = getopt.getopt(argv, "hS:D:L:E:R:", ["help", "search=", "download=", "read=", "episode="])
     except getopt.GetoptError:
         print_usage()
         sys.exit(2)
@@ -216,8 +226,13 @@ def main(argv):
             manga_url = arg
             if manga_url[0] != '/':
                 manga_url = '/'+manga_url
-            print('To Read %s' % (manga_url))
-
+            print('Wait...\r', end='')
+            manga = get_manga_by_url(manga_url)
+            episode_pages = download_episode(manga, episodes_t, silent=True)
+            for e_name, e_count, p in episode_pages:
+                path = '"' +  manga[0] + '/Chapter ' + str(e_count) + ' ' + str(e_name) + '"'
+                os.system('feh '+path)
+            print('Read Complete...')
 
 if __name__ == '__main__':
     # name = read_mana_name()  

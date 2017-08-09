@@ -83,9 +83,14 @@ def get_episodes_list(manga):
     episodes_c = tree.xpath(
         '//div[@id="chapterlist"]/table[@id="listing"]/tr/td/a/text()'
     )
+    episodes_d = tree.xpath(
+        '//div[@id="chapterlist"]/table[@id="listing"]/tr/td/text()'
+    )
     episodes_name = [e.split(':')[-1].strip() for e in episodes_n if ':' in e]
     episodes_count = [ec.split()[-1].strip() for ec in episodes_c]
-    episodes_all = dict(zip(episodes_count, episodes_name))
+    episodes_date = [d for d in episodes_d if len(d.split('/')) == 3]
+    data = list(zip(episodes_name, episodes_date))
+    episodes_all = dict(zip(episodes_count, data))
     return episodes_all
 
 
@@ -108,14 +113,14 @@ def download_episode(manga, episodes, silent=False):
             continue
         episode_url = url_root+manga[1]+'/'+str(episode)
         try:
-            os.mkdir('Chapter ' + episode + ' ' + episodes_all[episode])
+            os.mkdir('Chapter ' + episode + ' ' + episodes_all[episode][0])
         except:
             pass
-        os.chdir('Chapter ' + episode + ' ' + episodes_all[episode])
+        os.chdir('Chapter ' + episode + ' ' + episodes_all[episode][0])
         page = requests.get(episode_url)
         tree = html.fromstring(page.content)
         page_count = len(tree.xpath('//select[@id="pageMenu"]/option/text()'))
-        episode_pages.append((episodes_all[episode], episode, page_count))
+        episode_pages.append((episodes_all[episode][0], episode, page_count))
         for p in range(1, page_count+1):
             episode_page_url = episode_url + '/' + str(p)
             # print('Episode %i : %s' % (p, episode_page_url))
@@ -124,17 +129,17 @@ def download_episode(manga, episodes, silent=False):
             image_url = tree.xpath('//img[@name="img"]/@src')[0]
             filename = str(p) + '.' + image_url.split('.')[-1]
             if silent:
-                print('Downloading [%s](%i/%i) ...\r' % (episodes_all[episode], p, page_count), end='')
+                print('Downloading [%s](%i/%i) ...\r' % (episodes_all[episode][0], p, page_count), end='')
             else:
-                print('Downloading Episode #%s %s (%i/%i) ...\r' % (episode, episodes_all[episode], p, page_count), end='')
+                print('Downloading Episode #%s %s (%i/%i) ...\r' % (episode, episodes_all[episode][0], p, page_count), end='')
             response = requests.get(image_url, stream=True)
             with open(filename, "wb") as handle:
                 for data in response.iter_content():
                     handle.write(data)
         if silent:
-            print('Downloaded  [%s](%i/%i) ...\r' % (episodes_all[episode], page_count, page_count))
+            print('Downloaded  [%s](%i/%i) ...\r' % (episodes_all[episode][0], page_count, page_count))
         else:
-            print('Downloaded  Episode #%s %s (%i/%i) ...\r' % (episode, episodes_all[episode], page_count, page_count))
+            print('Downloaded  Episode #%s %s (%i/%i) ...\r' % (episode, episodes_all[episode][0], page_count, page_count))
         os.chdir('..')
     os.chdir('..')
     return episode_pages
@@ -163,9 +168,12 @@ def get_user_action():
                     episode_list,
                     key=lambda x: int(x.lower().rstrip(
                         string.ascii_lowercase)))
-                text = '{:25s} {:25s}\n'.format('Episode #', 'Episode Name')
+                text = '{:25s} {:100s} {:15s}\n'.format('#',
+                                                       'Episode Name', 'Date')
                 for i in sorted_list:
-                    text += '{:25s} {:25s}\n'.format(str(i), episode_list[i])
+                    text += '{:25s} {:100s} {:15s}\n'.format(str(i),
+                                                            episode_list[i][0],
+                                                            episode_list[i][1])
                 pydoc.pager(text)
             elif i == '0':
                 break
@@ -245,9 +253,12 @@ def main(argv):
                 episode_list,
                 key=lambda x: int(x.lower().rstrip(
                     string.ascii_lowercase)))
-            text = '{:15s} {:25s}\n'.format('#', 'Episode Name')
+            text = '{:15s} {:100s} {:15s}\n'.format('#', 'Episode Name',
+                                                   'Release Date')
             for i in sorted_list:
-                text += '{:15s} {:25s}\n'.format(str(i), episode_list[i])
+                text += '{:15s} {:100s} {:15s}\n'.format(str(i),
+                                                        episode_list[i][0],
+                                                        episode_list[i][1])
             print(text)
 
 
